@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#6366f1">
-<title>我们 · 双人待办</title>
+<title>我们 · 共享待办</title>
 <style>
   :root{
     --primary:#6366f1; --primary-dark:#4f46e5; --primary-soft:#eef2ff;
@@ -116,6 +116,51 @@
   .mini{width:28px;height:28px;border-radius:8px;background:#f6f7fa;color:var(--muted);font-size:13px}
   .empty{text-align:center;color:var(--muted);padding:60px 20px}
   .empty .e-icon{font-size:48px;margin-bottom:14px}
+
+  /* ---------- 清单日期分组 ---------- */
+  .group-head{display:flex;align-items:center;justify-content:space-between;
+    padding:18px 4px 8px;font-size:13px;font-weight:700;color:var(--primary-dark)}
+  .group-head:first-child{padding-top:8px}
+  .group-head.overdue{color:var(--danger)}
+  .group-head .n{font-size:11px;color:var(--muted);font-weight:500}
+
+  /* ---------- 查看任务弹层 ---------- */
+  .view-sheet{display:flex;flex-direction:column;height:88vh;
+    padding-bottom:calc(var(--safe-bottom) + 16px)}
+  .v-title{font-size:22px;font-weight:700;line-height:1.45;word-break:break-word;
+    padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .v-content{flex:1;min-height:50vh;margin-top:12px;background:#fff;
+    border:1px solid var(--line);border-radius:14px;padding:16px;font-size:16px;
+    line-height:1.8;white-space:pre-wrap;word-break:break-word;overflow-y:auto;
+    color:var(--text)}
+  .v-content.placeholder{color:var(--muted)}
+  .v-note-tip{padding-top:6px}
+  .v-content.editing{-webkit-user-select:text;user-select:text;box-shadow:0 0 0 2px var(--primary-soft) inset}
+  .v-content .vnl{margin:2px 0}
+  .v-content .vnl.vbullet{color:var(--text)}
+  .v-content .vnl.vck{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+  .v-content .vchk{flex:none;width:20px;height:20px;border:2px solid #cfd3df;border-radius:5px;
+    margin-top:6px;display:flex;align-items:center;justify-content:center;
+    font-size:14px;line-height:1;color:#fff;font-weight:700;background:transparent}
+  .v-content .vnl.vck.done .vchk{background:var(--success);border-color:var(--success)}
+  .v-content .vnl.vck.done .vchk-text{color:var(--muted);text-decoration:line-through}
+  .v-content .vchk-text{min-width:0;word-break:break-word}
+  .v-content .vimg-row{margin:6px 0}
+  .v-content .vimg{max-width:100%;max-height:320px;border-radius:10px;display:block;cursor:zoom-in;
+    min-height:0}
+  .v-content .vimg:not(.ok){min-height:60px;background:#f3f4f8;border-radius:10px}
+  .img-lb{position:fixed;inset:0;background:rgba(10,12,20,.92);z-index:200;display:flex;
+    align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+  .img-lb img{max-width:100%;max-height:100%;border-radius:8px}
+  .note-bar{display:flex;gap:8px;margin-top:10px}
+  .note-bar button{flex:1;margin-top:0;padding:9px;font-size:13px;border-radius:10px;
+    background:#f3f4f8;border:1px solid var(--line);color:var(--muted);font-weight:500}
+  .note-bar button:active{background:#e8eaf0}
+  .v-meta{margin-top:14px;display:grid;grid-template-columns:auto 1fr;gap:9px 16px;font-size:13px}
+  .v-meta .k{color:var(--muted);white-space:nowrap}
+  .v-meta .v{word-break:break-word}
+  .v-actions{display:flex;gap:10px;margin-top:14px}
+  .v-actions .btn{flex:1;width:auto;margin-top:0}
   .fab{position:fixed;right:20px;bottom:calc(var(--safe-bottom) + 24px);width:58px;height:58px;
     border-radius:18px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;font-size:30px;
     box-shadow:0 8px 24px rgba(99,102,241,.4);display:flex;align-items:center;justify-content:center;z-index:30}
@@ -211,7 +256,7 @@
 <div id="loginScreen" class="screen hidden">
   <div class="brand">
     <div class="logo">♥</div>
-    <h1>我们 · 双人待办</h1>
+    <h1>我们 · 共享待办</h1>
     <p>两个人的清单，一件事都不落下</p>
   </div>
   <div class="card">
@@ -229,7 +274,7 @@
     <button id="loginBtn" class="btn" type="button">登录 / 注册</button>
     <div id="loginErr" class="err"></div>
   </div>
-  <div class="hint">验证码将发送到你的手机 · 新用户会自动注册<br>两人各用自己的手机号登录，再用邀请码加入同一个空间</div>
+  <div class="hint">验证码将发送到你的手机 · 新用户会自动注册<br>各用自己的手机号登录，再用邀请码加入同一个空间</div>
 </div>
 
 <!-- 配对 -->
@@ -337,13 +382,37 @@
   </div>
 </div>
 
+<!-- 查看任务弹层 -->
+<div id="viewSheet" class="sheet-mask hidden">
+  <div class="sheet view-sheet">
+    <div class="handle"></div>
+    <div class="v-title" id="vTitle"></div>
+    <div class="v-content" id="vContent"></div>
+    <div class="note-bar hidden" id="noteBar">
+      <button id="noteChkBtn" type="button">☐ 清单项</button>
+      <button id="noteBulletBtn" type="button">• 项目符号</button>
+      <button id="noteImgBtn" type="button">🖼 图片</button>
+      <button id="noteDoneBtn" type="button">完成</button>
+      <input type="file" id="noteImgInput" accept="image/*" class="hidden">
+    </div>
+    <div class="v-meta" id="vMeta"></div>
+    <div class="v-actions">
+      <button id="vToggle" class="btn ghost" type="button">标记完成</button>
+      <button id="vEdit" class="btn" type="button">✎ 详情</button>
+    </div>
+  </div>
+</div>
+
+<!-- 图片灯箱 -->
+<div id="imgLb" class="img-lb hidden"><img id="lbImg" alt=""></div>
+
 <!-- 任务编辑弹层 -->
 <div id="taskSheet" class="sheet-mask hidden">
   <div class="sheet">
     <div class="handle"></div>
     <h3 id="taskSheetTitle">添加任务</h3>
-    <div class="field"><label>任务内容</label><textarea id="fTitle" placeholder="要做什么？" style="min-height:56px"></textarea></div>
-    <div class="field"><label>备注（可选）</label><input id="fNotes" placeholder="补充说明…"></div>
+    <div class="field"><label>标题</label><textarea id="fTitle" placeholder="要做什么？" style="min-height:44px"></textarea></div>
+    <div class="field"><label>内容</label><textarea id="fNotes" placeholder="补充说明、清单明细、链接……" style="min-height:50vh"></textarea></div>
     <div class="field"><label>分类</label>
       <div class="seg" id="catSeg">
         <div class="opt on" data-v="general">通用</div>
@@ -8951,7 +9020,7 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
 </script>
 <script>
 /* ============================================================
-   我们 · 双人待办  —  主逻辑
+   我们 · 共享待办  —  主逻辑
    基于 WorkBuddy Cloud SDK（Auth + Database）
    ============================================================ */
 
@@ -8972,6 +9041,8 @@ const S = {
   cat: 'all',
   pendingOtp: null,   // { phone, verificationId, isExistingUser }
   editId: null,
+  noteEditing: false,  // 查看页内容框是否处于编辑态
+  imgCache: new Map(), // 便签图片对象路径 → blob URL
   formCat: 'general',
   formRepeat: 'none',
   pollTimer: null,
@@ -8980,6 +9051,8 @@ const S = {
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth() + 1,
   calSelected: null,
+  viewId: null,       // 查看弹层当前任务 id
+  lastSnap: '',       // 上次渲染的数据快照（防闪烁）
 }
 
 const $ = (id) => document.getElementById(id)
@@ -9189,10 +9262,18 @@ async function enterMain() {
 
 async function refreshAll() {
   await Promise.all([loadMembers(), loadTasks()])
-  renderTasks()
-  renderCalendar()
-  // 当天面板开着时同步刷新内容
-  if (!$('daySheet').classList.contains('hidden') && S.calSelected) openDaySheet(S.calSelected)
+  // 数据没变化就跳过重绘，避免每 4 秒闪烁
+  const snap = JSON.stringify([S.tasks, S.members, S.cat])
+  if (snap !== S.lastSnap) {
+    S.lastSnap = snap
+    const st = $('taskList').scrollTop
+    renderTasks()
+    renderCalendar()
+    $('taskList').scrollTop = st
+    // 弹层开着时同步刷新内容
+    if (!$('daySheet').classList.contains('hidden') && S.calSelected) openDaySheet(S.calSelected)
+    if (!$('viewSheet').classList.contains('hidden') && S.viewId && !S.noteEditing) openViewSheet(S.viewId)
+  }
   $('memberInfo').textContent = S.members.length + ' 位成员'
 }
 
@@ -9250,18 +9331,55 @@ function dueTag(t) {
 const REPEAT_LABEL = { none:'', daily:'每天', weekly:'每周', monthly:'每月' }
 const CAT_LABEL = { general:'通用', shopping:'购物', schedule:'日程' }
 
-function visibleTasks() {
+function filteredTasks() {
   let list = S.tasks
   if (S.cat === 'mine') list = list.filter(t => t.assignee_uid === uidMe())
   else if (S.cat !== 'all') list = list.filter(t => t.category === S.cat)
-  // 未完成在前，然后按截止日期
-  return list.slice().sort((a,b) => {
-    if (a.status !== b.status) return a.status === 'done' ? 1 : -1
-    if (a.due_date && b.due_date) return new Date(a.due_date) - new Date(b.due_date)
-    if (a.due_date) return -1
-    if (b.due_date) return 1
-    return new Date(a.created_at) - new Date(b.created_at)
-  })
+  return list
+}
+
+/* 日期分组的友好标签：今天 / 明天 / 本周四（11月19日）/ 下周五（11月20日），
+   超过两周直接显示日期 */
+const WEEK_CN = '日一二三四五六'
+function groupLabel(key) {
+  const p = key.split('-').map(Number)
+  const d = new Date(p[0], p[1] - 1, p[2])
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const md = p[1] + '月' + p[2] + '日'
+  const wd = '周' + WEEK_CN[d.getDay()]
+  if (d.getTime() === today.getTime()) return '今天（' + md + '）'
+  const tmr = new Date(today); tmr.setDate(tmr.getDate() + 1)
+  if (d.getTime() === tmr.getTime()) return '明天（' + md + '）'
+  if (d < today) return '已逾期（' + md + '）'
+  const dow = (today.getDay() + 6) % 7   // 周一=0
+  const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - dow)
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6)
+  const nextEnd = new Date(weekEnd); nextEnd.setDate(nextEnd.getDate() + 7)
+  if (d <= weekEnd) return '本周' + WEEK_CN[d.getDay()] + '（' + md + '）'
+  if (d <= nextEnd) return '下周' + WEEK_CN[d.getDay()] + '（' + md + '）'
+  const yr = p[0] !== today.getFullYear() ? p[0] + '年' : ''
+  return yr + md + '（' + wd + '）'
+}
+
+function taskCardHtml(t) {
+  const done = t.status === 'done'
+  const assignee = t.assignee_uid ? `<span class="tag assign">👤 ${esc(nameOf(t.assignee_uid))}</span>` : ''
+  const repeat = t.repeat_rule && t.repeat_rule !== 'none'
+    ? `<span class="tag repeat">↻ ${REPEAT_LABEL[t.repeat_rule] || ''}</span>` : ''
+  const lastDone = (t.repeat_rule !== 'none' && t.completed_by)
+    ? `<span class="tag">上次 ${esc(nameOf(t.completed_by))} 完成</span>` : ''
+  return `<div class="task ${done ? 'done' : ''}" data-id="${t.id}">
+      <div class="check" data-act="toggle">${done ? '✓' : ''}</div>
+      <div class="task-body" data-act="view">
+        <div class="t-title">${esc(t.title)}</div>
+        ${t.notes ? `<div class="t-notes">${esc(t.notes)}</div>` : ''}
+        <div class="t-meta">
+          <span class="tag cat-${t.category}">${CAT_LABEL[t.category] || '通用'}</span>
+          ${assignee}${dueTag(t)}${repeat}${lastDone}
+        </div>
+      </div>
+      <div class="task-tools"><button class="mini" data-act="edit" title="编辑">✎</button></div>
+    </div>`
 }
 
 function renderTasks() {
@@ -9279,32 +9397,38 @@ function renderTasks() {
     badge.textContent = n
   })
 
-  const list = visibleTasks()
+  const list = filteredTasks()
   const wrap = $('taskList')
   if (!list.length) {
     wrap.innerHTML = `<div class="empty"><div class="e-icon">📝</div>这里还没有任务<br>点右下角 + 添加一件吧</div>`
     return
   }
-  wrap.innerHTML = list.map(t => {
-    const done = t.status === 'done'
-    const assignee = t.assignee_uid ? `<span class="tag assign">👤 ${esc(nameOf(t.assignee_uid))}</span>` : ''
-    const repeat = t.repeat_rule && t.repeat_rule !== 'none'
-      ? `<span class="tag repeat">↻ ${REPEAT_LABEL[t.repeat_rule] || ''}</span>` : ''
-    const lastDone = (t.repeat_rule !== 'none' && t.completed_by)
-      ? `<span class="tag">上次 ${esc(nameOf(t.completed_by))} 完成</span>` : ''
-    return `<div class="task ${done ? 'done' : ''}" data-id="${t.id}">
-      <div class="check" data-act="toggle">${done ? '✓' : ''}</div>
-      <div class="task-body" data-act="edit">
-        <div class="t-title">${esc(t.title)}</div>
-        ${t.notes ? `<div class="t-notes">${esc(t.notes)}</div>` : ''}
-        <div class="t-meta">
-          <span class="tag cat-${t.category}">${CAT_LABEL[t.category] || '通用'}</span>
-          ${assignee}${dueTag(t)}${repeat}${lastDone}
-        </div>
-      </div>
-      <div class="task-tools"><button class="mini" data-act="edit" title="编辑">✎</button></div>
-    </div>`
-  }).join('')
+
+  // 按日期分组：逾期/有日期的按天分组，无日期、已完成单独成组
+  const byDate = new Map()
+  const noDate = [], doneList = []
+  list.forEach(t => {
+    if (t.status === 'done') { doneList.push(t); return }
+    const k = t.due_date ? dateKeyOf(t.due_date) : ''
+    if (!k) { noDate.push(t); return }
+    if (!byDate.has(k)) byDate.set(k, [])
+    byDate.get(k).push(t)
+  })
+  const sortByDue = arr => arr.sort((a, b) =>
+    (a.due_date ? new Date(a.due_date) : 0) - (b.due_date ? new Date(b.due_date) : 0) ||
+    new Date(a.created_at) - new Date(b.created_at))
+  byDate.forEach(sortByDue); sortByDue(noDate); sortByDue(doneList)
+
+  const groups = [...byDate.keys()].sort().map(k => ({
+    label: groupLabel(k), overdue: groupLabel(k).startsWith('已逾期'), items: byDate.get(k)
+  }))
+  if (noDate.length) groups.push({ label: '无日期', overdue: false, items: noDate })
+  if (doneList.length) groups.push({ label: '已完成', overdue: false, items: doneList })
+
+  wrap.innerHTML = groups.map(g =>
+    `<div class="group-head${g.overdue ? ' overdue' : ''}"><span>${esc(g.label)}</span><span class="n">${g.items.length} 项</span></div>`
+    + g.items.map(taskCardHtml).join('')
+  ).join('')
 }
 
 // 分类切换
@@ -9315,14 +9439,317 @@ document.querySelectorAll('#catTabs .cat').forEach(el => {
   })
 })
 
-// 任务列表点击委托
+// 任务列表点击委托：勾选=切换完成，✎=直接编辑，其他区域=查看
 $('taskList').addEventListener('click', (e) => {
   const taskEl = e.target.closest('.task')
   if (!taskEl) return
   const id = Number(taskEl.dataset.id)
   const act = e.target.closest('[data-act]')?.dataset.act
   if (act === 'toggle') toggleTask(id)
-  else openTaskSheet(id)
+  else if (act === 'edit') openTaskSheet(id)
+  else openViewSheet(id)
+})
+
+/* ============================================================
+   查看任务弹层（便签式内容：点击内容框直接编辑，支持清单勾选）
+   内容存储为纯文本 notes，行首标记：
+   「☐ 」= 未完成清单项，「☑ 」= 已完成清单项，「• 」= 项目符号
+   ============================================================ */
+function renderNotePreview() {
+  const t = S.tasks.find(x => x.id === S.viewId)
+  if (!t) return
+  const box = $('vContent')
+  box.classList.remove('editing')
+  box.contentEditable = 'false'
+  const notes = t.notes || ''
+  if (!notes.trim()) {
+    box.innerHTML = '<div class="v-note-tip">点这里写点补充内容～<br>输入「☐ +空格」开头可创建清单项，<br>完成后点前面的方框勾选划掉</div>'
+    box.classList.add('placeholder')
+    return
+  }
+  box.classList.remove('placeholder')
+  box.innerHTML = notes.split('\n').map((line, i) => {
+    const m = line.match(/^([☐☑•])\s?(.*)$/)
+    if (!m) {
+      const im = line.match(/^!\[img\]\((.+)\)$/)
+      if (im) return `<div class="vnl vimg-row"><img class="vimg" data-src="${esc(im[1])}" alt="图片"></div>`
+      return `<div class="vnl">${esc(line) || '<br>'}</div>`
+    }
+    if (m[1] === '•') return `<div class="vnl vbullet">• ${esc(m[2]) || '<br>'}</div>`
+    const done = m[1] === '☑'
+    return `<div class="vnl vck${done ? ' done' : ''}">` +
+      `<span class="vchk" data-line="${i}">${done ? '✓' : ''}</span>` +
+      `<span class="vchk-text">${esc(m[2]) || '（空）'}</span></div>`
+  }).join('')
+  // 图片加载：http/data 直接显示；对象路径经 SDK 鉴权下载为 blob
+  box.querySelectorAll('.vimg[data-src]').forEach(el => {
+    const ref = el.dataset.src
+    if (/^(https?:|data:)/.test(ref)) { el.src = ref; el.classList.add('ok') }
+    else loadNoteImage(ref, el)
+  })
+}
+
+function enterNoteEdit() {
+  const t = S.tasks.find(x => x.id === S.viewId)
+  if (!t) return
+  S.noteEditing = true
+  const box = $('vContent')
+  box.classList.add('editing')
+  box.classList.remove('placeholder')
+  box.contentEditable = 'true'
+  box.textContent = t.notes || ''
+  $('noteBar').classList.remove('hidden')
+  box.focus()
+  setCaretOffset(box, box.textContent.length)
+}
+
+// 退出编辑态；save=true 时把当前文本保存到数据库
+function exitNoteEdit(save) {
+  if (!S.noteEditing) return
+  S.noteEditing = false
+  const t = S.tasks.find(x => x.id === S.viewId)
+  const box = $('vContent')
+  const notes = box.textContent.replace(/\u00a0/g, ' ').replace(/\n+$/, '')
+  box.contentEditable = 'false'
+  $('noteBar').classList.add('hidden')
+  if (t && save && notes !== (t.notes || '')) {
+    saveNoteText(t, notes)
+  } else {
+    renderNotePreview()
+  }
+}
+
+async function saveNoteText(t, notes) {
+  t.notes = notes // 乐观更新本地，立即重绘
+  renderNotePreview()
+  try {
+    const r = await cloud.database.from('tasks')
+      .update({ notes, updated_at: new Date().toISOString() }).eq('id', t.id).select()
+    if (r.error) throw new Error(r.error.message)
+    await refreshAll()
+  } catch (e) { toast(e.message || '保存失败') }
+  // refreshAll 后若查看页还开着，保持预览态
+  if (!$('viewSheet').classList.contains('hidden')) renderNotePreview()
+}
+
+// 勾选 / 取消勾选清单项（不影响任务整体完成状态）
+async function toggleNoteLine(lineIdx) {
+  const t = S.tasks.find(x => x.id === S.viewId)
+  if (!t) return
+  const lines = (t.notes || '').split('\n')
+  const m = lines[lineIdx] && lines[lineIdx].match(/^([☐☑])\s?(.*)$/)
+  if (!m) return
+  lines[lineIdx] = (m[1] === '☑' ? '☐' : '☑') + ' ' + m[2]
+  await saveNoteText(t, lines.join('\n'))
+}
+
+// 光标偏移工具（编辑态工具条用）
+function caretOffset(el) {
+  const sel = window.getSelection()
+  if (!sel.rangeCount) return -1
+  const r = sel.getRangeAt(0).cloneRange()
+  r.selectNodeContents(el)
+  r.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
+  return r.toString().length
+}
+function setCaretOffset(el, off) {
+  const sel = window.getSelection()
+  if (!sel.rangeCount) return
+  const r = document.createRange()
+  let cur = 0
+  let done = false
+  const walk = (node) => {
+    if (done) return
+    if (node.nodeType === 3) {
+      if (cur + node.length >= off) {
+        r.setStart(node, off - cur); r.collapse(true); done = true
+      } else cur += node.length
+    } else {
+      for (const c of node.childNodes) walk(c)
+    }
+  }
+  walk(el)
+  if (!done) { r.selectNodeContents(el); r.collapse(false) }
+  sel.removeAllRanges(); sel.addRange(r)
+}
+
+// 在光标处插入任意文本（支持多行，如图片标记）
+function insertAtCaretText(str) {
+  const box = $('vContent')
+  if (!S.noteEditing) enterNoteEdit()
+  box.focus()
+  let off = caretOffset(box)
+  if (off < 0) off = box.textContent.length
+  const text = box.textContent
+  const newText = text.slice(0, off) + str + text.slice(off)
+  box.textContent = newText
+  setCaretOffset(box, off + str.length)
+}
+
+// 在光标所在行行首插入标记（清单 ☐ / 项目符号 •）
+function insertNoteMark(mark) {
+  const box = $('vContent')
+  if (!S.noteEditing) enterNoteEdit()
+  box.focus()
+  let off = caretOffset(box)
+  if (off < 0) off = box.textContent.length
+  const text = box.textContent
+  const lineStart = text.lastIndexOf('\n', Math.max(0, off - 1)) + 1
+  let lineEnd = text.indexOf('\n', off)
+  if (lineEnd < 0) lineEnd = text.length
+  const line = text.slice(lineStart, lineEnd)
+  const content = line.replace(/^[☐☑•]\s?/, '')
+  const newLine = mark + (content ? ' ' + content : '')
+  const newText = text.slice(0, lineStart) + newLine + text.slice(lineEnd)
+  box.textContent = newText
+  setCaretOffset(box, lineStart + mark.length + 1)
+}
+
+/* 图片上传：压缩后传到云存储 task-images，插入 ![img](url) 标记 */
+async function compressImage(file) {
+  if (file.type === 'image/gif' || file.size < 400 * 1024) return file
+  const img = await new Promise((res, rej) => {
+    const url = URL.createObjectURL(file)
+    const im = new Image()
+    im.onload = () => { URL.revokeObjectURL(url); res(im) }
+    im.onerror = rej
+    im.src = url
+  })
+  const MAX = 1280
+  let w = img.width, h = img.height
+  if (Math.max(w, h) > MAX) { const k = MAX / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k) }
+  const cv = document.createElement('canvas')
+  cv.width = w; cv.height = h
+  cv.getContext('2d').drawImage(img, 0, 0, w, h)
+  return await new Promise(res => cv.toBlob(b => res(b || file), 'image/jpeg', 0.75))
+}
+
+async function uploadNoteImage(file, isRetry) {
+  if (!/^image\//.test(file.type)) { toast('请选择图片文件'); return }
+  const btn = $('noteImgBtn'); btn.disabled = true
+  if (!isRetry) toast('图片上传中…')
+  try {
+    const blob = await compressImage(file)
+    const ext = blob.type === 'image/png' ? 'png' : 'jpg'
+    const name = Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext
+    // 平台存储只支持 runtime 桶：shared/<uid>/... 所有登录成员可读，仅本人可写
+    const path = cloud.storage.sharedPath(uidMe(), 'notes/' + name)
+    const up = await cloud.storage.upload(path, blob, { contentType: blob.type })
+    if (up.error) throw new Error(up.error.message || '上传失败')
+    // 本地立即显示
+    S.imgCache.set(path, URL.createObjectURL(blob))
+    // 独立成行插入（notes 存对象路径，查看时经 SDK 鉴权下载）
+    insertAtCaretText('\n![img](' + path + ')\n')
+    toast('图片已插入')
+  } catch (e) {
+    const msg = e.message || ''
+    // 网络抖动自动重试一次
+    if (!isRetry && /fetch|network|abort/i.test(msg)) {
+      toast('网络不稳，自动重试…')
+      await new Promise(r => setTimeout(r, 1200))
+      btn.disabled = false
+      return uploadNoteImage(file, true)
+    }
+    if (/fetch|network/i.test(msg)) toast('网络请求失败，请检查电脑的网络/代理设置后重试')
+    else toast(msg || '图片上传失败')
+  }
+  finally { btn.disabled = false }
+}
+
+// 渲染时把图片标记加载为可显示的 blob URL
+async function loadNoteImage(path, el) {
+  if (S.imgCache.has(path)) { el.src = S.imgCache.get(path); el.classList.add('ok'); return }
+  try {
+    const r = await cloud.storage.download(path)
+    if (r.error || !r.data) return
+    const url = URL.createObjectURL(r.data)
+    S.imgCache.set(path, url)
+    el.src = url
+    el.classList.add('ok')
+  } catch (e) { /* 保持占位样式 */ }
+}
+
+function openViewSheet(id) {
+  if (S.noteEditing) exitNoteEdit(true) // 打开前先保存未完成的编辑
+  const t = S.tasks.find(x => x.id === id)
+  if (!t) return
+  S.viewId = id
+  $('vTitle').textContent = t.title
+  renderNotePreview()
+  const metaRows = [
+    ['分类', CAT_LABEL[t.category] || '通用'],
+    ['指派给', t.assignee_uid
+      ? `<span style="color:${colorOf(t.assignee_uid)};font-weight:600">● ${esc(nameOf(t.assignee_uid))}</span>`
+      : '<span style="color:var(--muted)">未指派</span>'],
+    ['截止', t.due_date ? `${esc(groupLabel(dateKeyOf(t.due_date)))} ${esc(new Date(t.due_date).toTimeString().slice(0,5))}` : '不限定'],
+    ['重复', t.repeat_rule && t.repeat_rule !== 'none' ? REPEAT_LABEL[t.repeat_rule] : '不重复'],
+    ['状态', t.status === 'done' ? '已完成' : '进行中'],
+  ]
+  $('vMeta').innerHTML = metaRows.map(([k, v]) =>
+    `<div class="k">${k}</div><div class="v">${v}</div>`).join('')
+
+  const toggleBtn = $('vToggle')
+  toggleBtn.textContent = t.status === 'done' ? '取消完成' : '标记完成'
+  toggleBtn.classList.toggle('ghost', t.status !== 'done')
+  show('viewSheet')
+}
+
+// 查看页点击：灯箱放大图片 → 勾选方框 → toggle；其他内容区域 → 进入编辑
+$('viewSheet').addEventListener('click', (e) => {
+  const img = e.target.closest('.vimg')
+  if (img && img.src) { $('lbImg').src = img.src; show('imgLb'); return }
+  const chk = e.target.closest('.vchk')
+  if (chk) { toggleNoteLine(Number(chk.dataset.line)); return }
+  if (e.target.closest('#vContent') && !S.noteEditing) { enterNoteEdit(); return }
+  if (e.target.closest('#noteBar')) return
+  if (e.target.closest('#vToggle') || e.target.closest('#vEdit')) return
+  closeOnMask(e)
+})
+$('imgLb').addEventListener('click', () => hide('imgLb'))
+
+// 编辑工具条：按钮用 mousedown 阻止失焦，点击后再操作
+$('noteChkBtn').addEventListener('mousedown', e => e.preventDefault())
+$('noteChkBtn').addEventListener('click', () => insertNoteMark('☐'))
+$('noteBulletBtn').addEventListener('mousedown', e => e.preventDefault())
+$('noteBulletBtn').addEventListener('click', () => insertNoteMark('•'))
+$('noteImgBtn').addEventListener('click', () => $('noteImgInput').click())
+$('noteImgInput').addEventListener('change', () => {
+  const f = $('noteImgInput').files[0]
+  $('noteImgInput').value = ''
+  if (f) uploadNoteImage(f)
+})
+$('noteDoneBtn').addEventListener('click', () => exitNoteEdit(true))
+
+// 失焦自动保存（焦点移出弹层时）
+$('vContent').addEventListener('blur', () => {
+  if (!S.noteEditing) return
+  setTimeout(() => {
+    if (!S.noteEditing) return
+    const ae = document.activeElement
+    if (ae && $('viewSheet').contains(ae)) return
+    exitNoteEdit(true)
+  }, 150)
+})
+
+// 粘贴时只保留纯文本
+$('vContent').addEventListener('paste', (e) => {
+  e.preventDefault()
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain')
+  const sel = window.getSelection()
+  if (sel.rangeCount) {
+    sel.getRangeAt(0).deleteContents()
+    sel.getRangeAt(0).insertNode(document.createTextNode(text))
+  }
+})
+
+$('vEdit').addEventListener('click', () => {
+  if (S.noteEditing) exitNoteEdit(true)
+  hide('viewSheet'); openTaskSheet(S.viewId)
+})
+$('vToggle').addEventListener('click', async () => {
+  if (S.noteEditing) exitNoteEdit(true)
+  await toggleTask(S.viewId)
+  if (!$('viewSheet').classList.contains('hidden')) openViewSheet(S.viewId)
 })
 
 /* ============================================================
@@ -9625,10 +10052,10 @@ $('calNext').addEventListener('click', () => shiftMonth(1))
 $('calToday').addEventListener('click', () => {
   const d = new Date(); S.calYear = d.getFullYear(); S.calMonth = d.getMonth() + 1; renderCalendar()
 })
-// 点长条 → 编辑该日程；点格子其他区域 → 打开当天日程面板
+// 点长条 → 查看该日程；点格子其他区域 → 打开当天日程面板
 $('calGrid').addEventListener('click', e => {
   const bar = e.target.closest('.cbar')
-  if (bar) { openTaskSheet(Number(bar.dataset.id)); return }
+  if (bar) { openViewSheet(Number(bar.dataset.id)); return }
   const cell = e.target.closest('.cal-cell')
   if (!cell) return
   openDaySheet(cell.dataset.date)
@@ -9643,7 +10070,7 @@ $('dayTaskList').addEventListener('click', async e => {
     await toggleTask(id)
     if (S.calSelected) openDaySheet(S.calSelected)
   } else if (act === 'edit') {
-    hide('daySheet'); openTaskSheet(id)
+    hide('daySheet'); openViewSheet(id)
   }
 })
 $('addTaskForDay').addEventListener('click', () => {
