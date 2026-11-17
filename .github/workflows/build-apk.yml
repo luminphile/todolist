@@ -36,17 +36,17 @@ jobs:
           ./gradlew assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk couple-todo-debug.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk couple-todo.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: couple-todo-apk
-          path: couple-todo-debug.apk
+          path: couple-todo.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-v${{ github.run_number }}
           name: apk build v${{ github.run_number }}
-          files: couple-todo-debug.apk
-          body: "Auto-built debug APK. Download couple-todo-debug.apk and install on Android."
+          files: couple-todo.apk
+          body: "Auto-built APK. Download couple-todo.apk and install on Android."

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#6366f1">
-<title>我们 · 双人待办</title>
+<title>我们 · 共享待办</title>
 <style>
   :root{
     --primary:#6366f1; --primary-dark:#4f46e5; --primary-soft:#eef2ff;
@@ -116,6 +116,51 @@
   .mini{width:28px;height:28px;border-radius:8px;background:#f6f7fa;color:var(--muted);font-size:13px}
   .empty{text-align:center;color:var(--muted);padding:60px 20px}
   .empty .e-icon{font-size:48px;margin-bottom:14px}
+
+  /* ---------- 清单日期分组 ---------- */
+  .group-head{display:flex;align-items:center;justify-content:space-between;
+    padding:18px 4px 8px;font-size:13px;font-weight:700;color:var(--primary-dark)}
+  .group-head:first-child{padding-top:8px}
+  .group-head.overdue{color:var(--danger)}
+  .group-head .n{font-size:11px;color:var(--muted);font-weight:500}
+
+  /* ---------- 查看任务弹层 ---------- */
+  .view-sheet{display:flex;flex-direction:column;height:88vh;
+    padding-bottom:calc(var(--safe-bottom) + 16px)}
+  .v-title{font-size:22px;font-weight:700;line-height:1.45;word-break:break-word;
+    padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .v-content{flex:1;min-height:50vh;margin-top:12px;background:#fff;
+    border:1px solid var(--line);border-radius:14px;padding:16px;font-size:16px;
+    line-height:1.8;white-space:pre-wrap;word-break:break-word;overflow-y:auto;
+    color:var(--text)}
+  .v-content.placeholder{color:var(--muted)}
+  .v-note-tip{padding-top:6px}
+  .v-content.editing{-webkit-user-select:text;user-select:text;box-shadow:0 0 0 2px var(--primary-soft) inset}
+  .v-content .vnl{margin:2px 0}
+  .v-content .vnl.vbullet{color:var(--text)}
+  .v-content .vnl.vck{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+  .v-content .vchk{flex:none;width:20px;height:20px;border:2px solid #cfd3df;border-radius:5px;
+    margin-top:6px;display:flex;align-items:center;justify-content:center;
+    font-size:14px;line-height:1;color:#fff;font-weight:700;background:transparent}
+  .v-content .vnl.vck.done .vchk{background:var(--success);border-color:var(--success)}
+  .v-content .vnl.vck.done .vchk-text{color:var(--muted);text-decoration:line-through}
+  .v-content .vchk-text{min-width:0;word-break:break-word}
+  .v-content .vimg-row{margin:6px 0}
+  .v-content .vimg{max-width:100%;max-height:320px;border-radius:10px;display:block;cursor:zoom-in;
+    min-height:0}
+  .v-content .vimg:not(.ok){min-height:60px;background:#f3f4f8;border-radius:10px}
+  .img-lb{position:fixed;inset:0;background:rgba(10,12,20,.92);z-index:200;display:flex;
+    align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+  .img-lb img{max-width:100%;max-height:100%;border-radius:8px}
+  .note-bar{display:flex;gap:8px;margin-top:10px}
+  .note-bar button{flex:1;margin-top:0;padding:9px;font-size:13px;border-radius:10px;
+    background:#f3f4f8;border:1px solid var(--line);color:var(--muted);font-weight:500}
+  .note-bar button:active{background:#e8eaf0}
+  .v-meta{margin-top:14px;display:grid;grid-template-columns:auto 1fr;gap:9px 16px;font-size:13px}
+  .v-meta .k{color:var(--muted);white-space:nowrap}
+  .v-meta .v{word-break:break-word}
+  .v-actions{display:flex;gap:10px;margin-top:14px}
+  .v-actions .btn{flex:1;width:auto;margin-top:0}
   .fab{position:fixed;right:20px;bottom:calc(var(--safe-bottom) + 24px);width:58px;height:58px;
     border-radius:18px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;font-size:30px;
     box-shadow:0 8px 24px rgba(99,102,241,.4);display:flex;align-items:center;justify-content:center;z-index:30}
@@ -211,7 +256,7 @@
 <div id="loginScreen" class="screen hidden">
   <div class="brand">
     <div class="logo">♥</div>
-    <h1>我们 · 双人待办</h1>
+    <h1>我们 · 共享待办</h1>
     <p>两个人的清单，一件事都不落下</p>
   </div>
   <div class="card">
@@ -229,7 +274,7 @@
     <button id="loginBtn" class="btn" type="button">登录 / 注册</button>
     <div id="loginErr" class="err"></div>
   </div>
-  <div class="hint">验证码将发送到你的手机 · 新用户会自动注册<br>两人各用自己的手机号登录，再用邀请码加入同一个空间</div>
+  <div class="hint">验证码将发送到你的手机 · 新用户会自动注册<br>各用自己的手机号登录，再用邀请码加入同一个空间</div>
 </div>
 
 <!-- 配对 -->
@@ -337,13 +382,37 @@
   </div>
 </div>
 
+<!-- 查看任务弹层 -->
+<div id="viewSheet" class="sheet-mask hidden">
+  <div class="sheet view-sheet">
+    <div class="handle"></div>
+    <div class="v-title" id="vTitle"></div>
+    <div class="v-content" id="vContent"></div>
+    <div class="note-bar hidden" id="noteBar">
+      <button id="noteChkBtn" type="button">☐ 清单项</button>
+      <button id="noteBulletBtn" type="button">• 项目符号</button>
+      <button id="noteImgBtn" type="button">🖼 图片</button>
+      <button id="noteDoneBtn" type="button">完成</button>
+      <input type="file" id="noteImgInput" accept="image/*" class="hidden">
+    </div>
+    <div class="v-meta" id="vMeta"></div>
+    <div class="v-actions">
+      <button id="vToggle" class="btn ghost" type="button">标记完成</button>
+      <button id="vEdit" class="btn" type="button">✎ 详情</button>
+    </div>
+  </div>
+</div>
+
+<!-- 图片灯箱 -->
+<div id="imgLb" class="img-lb hidden"><img id="lbImg" alt=""></div>
+
 <!-- 任务编辑弹层 -->
 <div id="taskSheet" class="sheet-mask hidden">
   <div class="sheet">
     <div class="handle"></div>
     <h3 id="taskSheetTitle">添加任务</h3>
-    <div class="field"><label>任务内容</label><textarea id="fTitle" placeholder="要做什么？" style="min-height:56px"></textarea></div>
-    <div class="field"><label>备注（可选）</label><input id="fNotes" placeholder="补充说明…"></div>
+    <div class="field"><label>标题</label><textarea id="fTitle" placeholder="要做什么？" style="min-height:44px"></textarea></div>
+    <div class="field"><label>内容</label><textarea id="fNotes" placeholder="补充说明、清单明细、链接……" style="min-height:50vh"></textarea></div>
     <div class="field"><label>分类</label>
       <div class="seg" id="catSeg">
         <div class="opt on" data-v="general">通用</div>

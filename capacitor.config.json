@@ -1,6 +1,6 @@
 {
   "appId": "com.luminphile.todolist",
-  "appName": "双人待办",
+  "appName": "我们的待办",
   "webDir": "www",
   "server": {
     "url": "https://wbapp-g03g7anizp4am9jehdnrwl.app.workbuddy.host/?sharecode=DQBDKQZ3CZ"
