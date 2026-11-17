@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">双人待办</string>
+    <string name="title_activity_main">双人待办</string>
+    <string name="package_name">com.luminphile.todolist</string>
+    <string name="custom_url_scheme">com.luminphile.todolist</string>
+</resources>
