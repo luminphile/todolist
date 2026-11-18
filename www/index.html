@@ -47,6 +47,13 @@
   .row{display:flex;gap:10px}
   .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.6}
   .err{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px;text-align:center}
+  .space-item{padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;margin-bottom:10px;
+    cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#fff}
+  .space-item:active{background:var(--primary-soft)}
+  .space-item.cur{border-color:var(--primary);background:var(--primary-soft)}
+  .space-item b{font-size:15px;font-weight:600}
+  .space-item .code{font-size:12px;color:var(--muted);margin-top:3px}
+  .space-item .arrow{color:var(--muted);font-size:18px}
   .tabs{display:flex;background:#eceef4;border-radius:12px;padding:4px;margin-bottom:20px;gap:4px}
   .tabs .tab{flex:1;text-align:center;padding:9px;border-radius:9px;font-size:14px;color:var(--muted);font-weight:500}
   .tabs .tab.on{background:#fff;color:var(--primary);box-shadow:0 2px 8px rgba(30,35,60,.08)}
@@ -305,6 +312,19 @@
     </div>
   </div>
   <div id="setupErr" class="err"></div>
+  <button id="setupBackBtn" class="btn ghost hidden" type="button" style="margin-top:10px">‹ 返回空间选择</button>
+</div>
+
+<!-- 空间选择（加入多个空间时） -->
+<div id="spacePickerScreen" class="screen hidden">
+  <div class="brand">
+    <div class="logo">♥</div>
+    <h1>选择空间</h1>
+    <p>你加入了多个空间，选择一个进入</p>
+  </div>
+  <div class="card" id="spaceList"></div>
+  <button id="pickCreateBtn" class="btn ghost" type="button" style="margin-top:12px">＋ 创建新空间</button>
+  <button id="pickJoinBtn" class="btn ghost" type="button" style="margin-top:10px">用邀请码加入其他空间</button>
 </div>
 
 <!-- 邀请码展示（创建成功后） -->
@@ -450,7 +470,8 @@
         <div class="hint" style="text-align:left;margin:6px 0 0">邀请码：<b id="settingsInvite" class="invite-pill">------</b></div>
       </div>
     </div>
-    <button id="logoutBtn" class="btn danger" type="button">退出登录</button>
+    <button id="switchSpaceBtn" class="btn ghost" type="button">切换空间 / 加入新空间</button>
+    <button id="logoutBtn" class="btn danger" type="button" style="margin-top:10px">退出登录</button>
     <button class="btn ghost" type="button" style="margin-top:10px" onclick="closeSettings()">关闭</button>
   </div>
 </div>
@@ -9043,6 +9064,7 @@ const S = {
   editId: null,
   noteEditing: false,  // 查看页内容框是否处于编辑态
   imgCache: new Map(), // 便签图片对象路径 → blob URL
+  mySpaces: [],        // 我加入的全部空间
   formCat: 'general',
   formRepeat: 'none',
   pollTimer: null,
@@ -9061,7 +9083,7 @@ const $ = (id) => document.getElementById(id)
 function show(id) { $(id).classList.remove('hidden') }
 function hide(id) { $(id).classList.add('hidden') }
 function showOnly(...ids) {
-  ['loadingScreen','loginScreen','setupScreen','inviteScreen','mainScreen'].forEach(x => {
+  ['loadingScreen','loginScreen','setupScreen','inviteScreen','spacePickerScreen','mainScreen'].forEach(x => {
     if (ids.includes(x)) show(x); else hide(x)
   })
 }
@@ -9126,17 +9148,61 @@ async function afterLogin() {
   } catch (e) {
     S.myUid = (S.session.user && S.session.user.id) || ''
   }
-  // 查我所在的第一个空间
+  // 查我加入的所有空间（RLS 只返回我是成员的）
+  let rows = null
   try {
-    const rows = unwrap(await cloud.database.from('spaces').select('*').order('created_at', { ascending: true }), '读取空间')
-    if (rows && rows.length) {
-      S.space = rows[0]
-      await enterMain()
-      return
-    }
-  } catch (e) { /* 没有空间，去配对 */ }
+    rows = unwrap(await cloud.database.from('spaces').select('*').order('created_at', { ascending: true }), '读取空间')
+  } catch (e) { rows = null }
+  if (rows && rows.length === 1) {
+    S.space = rows[0]
+    await enterMain()
+    return
+  }
+  if (rows && rows.length > 1) {
+    await openPicker()
+    return
+  }
+  $('setupBackBtn').classList.add('hidden')
   showOnly('setupScreen')
 }
+
+/* ============================================================
+   空间选择（多空间切换）
+   ============================================================ */
+async function openPicker() {
+  stopPolling()
+  try {
+    S.mySpaces = unwrap(await cloud.database.from('spaces').select('*').order('created_at', { ascending: true }), '读取空间') || []
+  } catch (e) { S.mySpaces = S.space ? [S.space] : [] }
+  $('spaceList').innerHTML = S.mySpaces.length
+    ? S.mySpaces.map(sp => `
+      <div class="space-item${S.space && sp.id === S.space.id ? ' cur' : ''}" data-sp="${sp.id}">
+        <div><b>${esc(sp.name || '我们的清单')}</b><div class="code">邀请码 ${esc(sp.invite_code || '------')}</div></div>
+        <span class="arrow">›</span>
+      </div>`).join('')
+    : '<div class="hint">还没有加入任何空间</div>'
+  showOnly('spacePickerScreen')
+}
+
+$('spaceList').addEventListener('click', async (e) => {
+  const it = e.target.closest('.space-item')
+  if (!it) return
+  const sp = S.mySpaces.find(x => String(x.id) === it.dataset.sp)
+  if (!sp) return
+  S.space = sp
+  await enterMain()
+})
+$('pickCreateBtn').addEventListener('click', () => {
+  $('setupBackBtn').classList.remove('hidden')
+  document.querySelector('[data-setup="create"]').click()
+  showOnly('setupScreen')
+})
+$('pickJoinBtn').addEventListener('click', () => {
+  $('setupBackBtn').classList.remove('hidden')
+  document.querySelector('[data-setup="join"]').click()
+  showOnly('setupScreen')
+})
+$('setupBackBtn').addEventListener('click', () => openPicker())
 
 /* ============================================================
    登录（手机号验证码）
@@ -9884,6 +9950,11 @@ $('settingsBtn').addEventListener('click', () => {
   show('settingsSheet')
 })
 function closeSettings() { hide('settingsSheet') }
+
+$('switchSpaceBtn').addEventListener('click', () => {
+  closeSettings()
+  openPicker()
+})
 
 $('saveNickBtn').addEventListener('click', async () => {
   const nick = $('nickInput').value.trim()

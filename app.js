@@ -22,6 +22,7 @@ const S = {
   editId: null,
   noteEditing: false,  // 查看页内容框是否处于编辑态
   imgCache: new Map(), // 便签图片对象路径 → blob URL
+  mySpaces: [],        // 我加入的全部空间
   formCat: 'general',
   formRepeat: 'none',
   pollTimer: null,
@@ -40,7 +41,7 @@ const $ = (id) => document.getElementById(id)
 function show(id) { $(id).classList.remove('hidden') }
 function hide(id) { $(id).classList.add('hidden') }
 function showOnly(...ids) {
-  ['loadingScreen','loginScreen','setupScreen','inviteScreen','mainScreen'].forEach(x => {
+  ['loadingScreen','loginScreen','setupScreen','inviteScreen','spacePickerScreen','mainScreen'].forEach(x => {
     if (ids.includes(x)) show(x); else hide(x)
   })
 }
@@ -105,17 +106,61 @@ async function afterLogin() {
   } catch (e) {
     S.myUid = (S.session.user && S.session.user.id) || ''
   }
-  // 查我所在的第一个空间
+  // 查我加入的所有空间（RLS 只返回我是成员的）
+  let rows = null
   try {
-    const rows = unwrap(await cloud.database.from('spaces').select('*').order('created_at', { ascending: true }), '读取空间')
-    if (rows && rows.length) {
-      S.space = rows[0]
-      await enterMain()
-      return
-    }
-  } catch (e) { /* 没有空间，去配对 */ }
+    rows = unwrap(await cloud.database.from('spaces').select('*').order('created_at', { ascending: true }), '读取空间')
+  } catch (e) { rows = null }
+  if (rows && rows.length === 1) {
+    S.space = rows[0]
+    await enterMain()
+    return
+  }
+  if (rows && rows.length > 1) {
+    await openPicker()
+    return
+  }
+  $('setupBackBtn').classList.add('hidden')
   showOnly('setupScreen')
 }
+
+/* ============================================================
+   空间选择（多空间切换）
+   ============================================================ */
+async function openPicker() {
+  stopPolling()
+  try {
+    S.mySpaces = unwrap(await cloud.database.from('spaces').select('*').order('created_at', { ascending: true }), '读取空间') || []
+  } catch (e) { S.mySpaces = S.space ? [S.space] : [] }
+  $('spaceList').innerHTML = S.mySpaces.length
+    ? S.mySpaces.map(sp => `
+      <div class="space-item${S.space && sp.id === S.space.id ? ' cur' : ''}" data-sp="${sp.id}">
+        <div><b>${esc(sp.name || '我们的清单')}</b><div class="code">邀请码 ${esc(sp.invite_code || '------')}</div></div>
+        <span class="arrow">›</span>
+      </div>`).join('')
+    : '<div class="hint">还没有加入任何空间</div>'
+  showOnly('spacePickerScreen')
+}
+
+$('spaceList').addEventListener('click', async (e) => {
+  const it = e.target.closest('.space-item')
+  if (!it) return
+  const sp = S.mySpaces.find(x => String(x.id) === it.dataset.sp)
+  if (!sp) return
+  S.space = sp
+  await enterMain()
+})
+$('pickCreateBtn').addEventListener('click', () => {
+  $('setupBackBtn').classList.remove('hidden')
+  document.querySelector('[data-setup="create"]').click()
+  showOnly('setupScreen')
+})
+$('pickJoinBtn').addEventListener('click', () => {
+  $('setupBackBtn').classList.remove('hidden')
+  document.querySelector('[data-setup="join"]').click()
+  showOnly('setupScreen')
+})
+$('setupBackBtn').addEventListener('click', () => openPicker())
 
 /* ============================================================
    登录（手机号验证码）
@@ -863,6 +908,11 @@ $('settingsBtn').addEventListener('click', () => {
   show('settingsSheet')
 })
 function closeSettings() { hide('settingsSheet') }
+
+$('switchSpaceBtn').addEventListener('click', () => {
+  closeSettings()
+  openPicker()
+})
 
 $('saveNickBtn').addEventListener('click', async () => {
   const nick = $('nickInput').value.trim()
