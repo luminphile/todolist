@@ -264,7 +264,6 @@
   <div class="brand">
     <div class="logo">♥</div>
     <h1>我们 · 共享待办</h1>
-    <p>两个人的清单，一件事都不落下</p>
   </div>
   <div class="card">
     <div class="field">
@@ -466,12 +465,14 @@
       <button id="saveNickBtn" class="btn ghost" type="button">保存昵称</button>
     </div>
     <div class="card">
-      <div class="field" style="margin:0"><label>邀请伙伴</label>
-        <div class="hint" style="text-align:left;margin:6px 0 0">邀请码：<b id="settingsInvite" class="invite-pill">------</b></div>
+      <div class="field" style="margin:0"><label>空间管理</label>
+        <div class="hint" style="text-align:left;margin:6px 0 0">当前空间：<b id="settingsSpaceName">------</b></div>
+        <div class="hint" style="text-align:left;margin:4px 0 0">邀请码：<b id="settingsInvite" class="invite-pill">------</b></div>
       </div>
     </div>
     <button id="switchSpaceBtn" class="btn ghost" type="button">切换空间 / 加入新空间</button>
-    <button id="logoutBtn" class="btn danger" type="button" style="margin-top:10px">退出登录</button>
+    <button id="leaveSpaceBtn" class="btn danger" type="button" style="margin-top:10px">退出当前空间</button>
+    <button id="logoutBtn" class="btn ghost" type="button" style="margin-top:10px">退出登录</button>
     <button class="btn ghost" type="button" style="margin-top:10px" onclick="closeSettings()">关闭</button>
   </div>
 </div>
@@ -9946,6 +9947,7 @@ async function toggleTask(id) {
    ============================================================ */
 $('settingsBtn').addEventListener('click', () => {
   $('nickInput').value = (S.members.find(m => m.user_uid === uidMe())?.nickname) || ''
+  $('settingsSpaceName').textContent = S.space?.name || '------'
   $('settingsInvite').textContent = S.space?.invite_code || '------'
   show('settingsSheet')
 })
@@ -9954,6 +9956,30 @@ function closeSettings() { hide('settingsSheet') }
 $('switchSpaceBtn').addEventListener('click', () => {
   closeSettings()
   openPicker()
+})
+
+$('leaveSpaceBtn').addEventListener('click', async () => {
+  if (!S.space) return
+  if (!confirm(`确定退出空间「${S.space.name}」吗？\n退出后将不再看到该空间的清单和日程，重新加入需要邀请码。`)) return
+  try {
+    const r = await cloud.database.from('members').delete()
+      .eq('space_id', S.space.id).eq('user_uid', uidMe())
+    if (r.error) throw new Error(r.error.message || '退出失败')
+    // 我是创建者且成员只剩我一个 → 连空间一起删除，不留空壳
+    if (S.space.owner_id === uidMe() && S.members.length <= 1) {
+      try {
+        await cloud.database.from('spaces').delete().eq('id', S.space.id)
+      } catch (e) { /* 删除空间失败不影响退出 */ }
+    }
+    stopPolling()
+    S.space = null
+    S.tasks = []
+    S.members = []
+    S.lastSnap = null
+    closeSettings()
+    toast('已退出空间')
+    await openPicker()
+  } catch (e) { toast(e.message || '退出失败') }
 })
 
 $('saveNickBtn').addEventListener('click', async () => {

@@ -264,7 +264,6 @@
   <div class="brand">
     <div class="logo">♥</div>
     <h1>我们 · 共享待办</h1>
-    <p>两个人的清单，一件事都不落下</p>
   </div>
   <div class="card">
     <div class="field">
@@ -466,12 +465,14 @@
       <button id="saveNickBtn" class="btn ghost" type="button">保存昵称</button>
     </div>
     <div class="card">
-      <div class="field" style="margin:0"><label>邀请伙伴</label>
-        <div class="hint" style="text-align:left;margin:6px 0 0">邀请码：<b id="settingsInvite" class="invite-pill">------</b></div>
+      <div class="field" style="margin:0"><label>空间管理</label>
+        <div class="hint" style="text-align:left;margin:6px 0 0">当前空间：<b id="settingsSpaceName">------</b></div>
+        <div class="hint" style="text-align:left;margin:4px 0 0">邀请码：<b id="settingsInvite" class="invite-pill">------</b></div>
       </div>
     </div>
     <button id="switchSpaceBtn" class="btn ghost" type="button">切换空间 / 加入新空间</button>
-    <button id="logoutBtn" class="btn danger" type="button" style="margin-top:10px">退出登录</button>
+    <button id="leaveSpaceBtn" class="btn danger" type="button" style="margin-top:10px">退出当前空间</button>
+    <button id="logoutBtn" class="btn ghost" type="button" style="margin-top:10px">退出登录</button>
     <button class="btn ghost" type="button" style="margin-top:10px" onclick="closeSettings()">关闭</button>
   </div>
 </div>

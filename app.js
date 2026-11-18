@@ -904,6 +904,7 @@ async function toggleTask(id) {
    ============================================================ */
 $('settingsBtn').addEventListener('click', () => {
   $('nickInput').value = (S.members.find(m => m.user_uid === uidMe())?.nickname) || ''
+  $('settingsSpaceName').textContent = S.space?.name || '------'
   $('settingsInvite').textContent = S.space?.invite_code || '------'
   show('settingsSheet')
 })
@@ -912,6 +913,30 @@ function closeSettings() { hide('settingsSheet') }
 $('switchSpaceBtn').addEventListener('click', () => {
   closeSettings()
   openPicker()
+})
+
+$('leaveSpaceBtn').addEventListener('click', async () => {
+  if (!S.space) return
+  if (!confirm(`确定退出空间「${S.space.name}」吗？\n退出后将不再看到该空间的清单和日程，重新加入需要邀请码。`)) return
+  try {
+    const r = await cloud.database.from('members').delete()
+      .eq('space_id', S.space.id).eq('user_uid', uidMe())
+    if (r.error) throw new Error(r.error.message || '退出失败')
+    // 我是创建者且成员只剩我一个 → 连空间一起删除，不留空壳
+    if (S.space.owner_id === uidMe() && S.members.length <= 1) {
+      try {
+        await cloud.database.from('spaces').delete().eq('id', S.space.id)
+      } catch (e) { /* 删除空间失败不影响退出 */ }
+    }
+    stopPolling()
+    S.space = null
+    S.tasks = []
+    S.members = []
+    S.lastSnap = null
+    closeSettings()
+    toast('已退出空间')
+    await openPicker()
+  } catch (e) { toast(e.message || '退出失败') }
 })
 
 $('saveNickBtn').addEventListener('click', async () => {
