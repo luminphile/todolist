@@ -280,14 +280,20 @@ async function enterMain() {
   showOnly('mainScreen')
   $('spaceTitle').textContent = S.space.name || '我们的清单'
   $('topInvite').textContent = S.space.invite_code || '------'
+  askNotifyPermission()
   await refreshAll()
   startPolling()
 }
 
 async function refreshAll() {
   await Promise.all([loadMembers(), loadTasks()])
+  checkReminders()
   // 数据没变化就跳过重绘，避免每 4 秒闪烁
-  const snap = JSON.stringify([S.tasks, S.members, S.cat])
+  // 快照额外计入分钟级时间：存在带截止时间的未完成任务时，
+  // 逾期/即将到期状态每分钟自动刷新（时间变化不影响其他场景的防闪烁）
+  const timeTick = S.tasks.some(t => t.due_date && t.status !== 'done')
+    ? Math.floor(Date.now() / 60000) : 0
+  const snap = JSON.stringify([S.tasks, S.members, S.cat, timeTick])
   if (snap !== S.lastSnap) {
     S.lastSnap = snap
     const st = $('taskList').scrollTop
@@ -354,6 +360,56 @@ function dueTag(t) {
 }
 const REPEAT_LABEL = { none:'', daily:'每天', weekly:'每周', monthly:'每月' }
 const CAT_LABEL = { general:'通用', shopping:'购物', schedule:'日程' }
+
+/* ============================================================
+   到点提醒：轮询时检查刚到期的未完成任务
+   - 每条任务只提醒一次（已提醒标记存 localStorage，key 含截止时间）
+   - app 打开时生效：页面内 toast + 系统通知（浏览器支持且已授权时）
+   ============================================================ */
+function remindKey(t) { return t.id + '_' + (t.due_date || '') }
+function loadReminded() {
+  try { return new Set(JSON.parse(localStorage.getItem('wbReminded') || '[]')) }
+  catch (e) { return new Set() }
+}
+function saveReminded(set) {
+  try { localStorage.setItem('wbReminded', JSON.stringify([...set])) } catch (e) {}
+}
+function checkReminders() {
+  const now = Date.now()
+  const set = loadReminded()
+  let changed = false
+  for (const t of S.tasks) {
+    if (!t.due_date || t.status === 'done') continue
+    const key = remindKey(t)
+    if (set.has(key)) continue
+    if (new Date(t.due_date).getTime() <= now) {
+      set.add(key); changed = true
+      const msg = '⏰「' + (t.title || '未命名任务') + '」到时间了'
+      toast(msg)
+      tryNotify('任务提醒', msg)
+    }
+  }
+  // 防膨胀：只保留当前任务的标记
+  if (set.size > 300) {
+    const live = new Set(S.tasks.map(t => remindKey(t)))
+    saveReminded(new Set([...set].filter(k => live.has(k))))
+    if (!changed) return
+  }
+  if (changed) saveReminded(set)
+}
+function tryNotify(title, body) {
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    new Notification(title, { body })
+  } catch (e) { /* WebView 不支持时静默 */ }
+}
+function askNotifyPermission() {
+  try {
+    if (typeof Notification === 'undefined' ||
+        Notification.permission === 'granted' || Notification.permission === 'denied') return
+    Notification.requestPermission().catch(() => {})
+  } catch (e) { /* 静默 */ }
+}
 
 function filteredTasks() {
   let list = S.tasks
