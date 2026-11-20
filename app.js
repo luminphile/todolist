@@ -281,6 +281,8 @@ async function enterMain() {
   $('spaceTitle').textContent = S.space.name || '我们的清单'
   $('topInvite').textContent = S.space.invite_code || '------'
   askNotifyPermission()
+  lnRequestPerm()      // apk：请求通知权限
+  lnBindTap()          // apk：点通知打开对应任务
   await refreshAll()
   startPolling()
 }
@@ -303,6 +305,7 @@ async function refreshAll() {
     // 弹层开着时同步刷新内容
     if (!$('daySheet').classList.contains('hidden') && S.calSelected) openDaySheet(S.calSelected)
     if (!$('viewSheet').classList.contains('hidden') && S.viewId && !S.noteEditing) openViewSheet(S.viewId)
+    lnSyncReminders()  // apk：任务变化时对账系统提醒
   }
   $('memberInfo').textContent = S.members.length + ' 位成员'
 }
@@ -408,6 +411,103 @@ function askNotifyPermission() {
     if (typeof Notification === 'undefined' ||
         Notification.permission === 'granted' || Notification.permission === 'denied') return
     Notification.requestPermission().catch(() => {})
+  } catch (e) { /* 静默 */ }
+}
+
+/* ============================================================
+   系统级到点提醒（apk）：Capacitor LocalNotifications
+   - 带截止时间的未完成任务 → 注册精确闹钟式系统通知
+     （息屏 / app 退到后台都能到点响铃弹出，锁屏可见）
+   - 完成 / 删除 / 改期 → 自动取消或重排
+   - 网页端无原生桥 → 全部跳过，仅用上面的页面内提醒
+   ============================================================ */
+function lnPlugin() {
+  try {
+    return (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.LocalNotifications) || null
+  } catch (e) { return null }
+}
+let lnChannelReady = false
+async function lnEnsureChannel() {
+  const LN = lnPlugin()
+  if (!LN || lnChannelReady) return LN
+  try {
+    await LN.createChannel({
+      id: 'task-alerts',
+      name: '任务提醒',
+      description: '待办任务到点提醒',
+      importance: 5,        // IMPORTANCE_HIGH：横幅弹出 + 声音
+      sound: 'default',
+      vibration: true,
+      visibility: 1,        // 锁屏上显示内容
+    })
+    lnChannelReady = true
+  } catch (e) { /* 渠道创建失败不阻塞 */ }
+  return LN
+}
+async function lnRequestPerm() {
+  const LN = await lnEnsureChannel()
+  if (!LN) return
+  try {
+    const p = await LN.checkPermissions()
+    if (p && p.display !== 'granted') await LN.requestPermissions()
+  } catch (e) { /* 静默 */ }
+}
+// 对账同步：期望注册的提醒 vs 系统里已注册的，差量增删改
+let lnSyncing = false
+async function lnSyncReminders() {
+  const LN = lnPlugin()
+  if (!LN || lnSyncing || !S.space) return
+  lnSyncing = true
+  try {
+    const now = Date.now()
+    const want = new Map()   // id -> { at, title }
+    for (const t of S.tasks) {
+      if (!t.due_date || t.status === 'done') continue
+      const at = new Date(t.due_date).getTime()
+      // 只排未来的；超过 14 天的先不排（太久远的等临近再排，避免堆积）
+      if (at <= now || at - now > 14 * 24 * 3600 * 1000) continue
+      want.set(Number(t.id), { at, title: t.title })
+    }
+    const pending = await LN.getPending()
+    const have = new Map()
+    for (const n of (pending.notifications || [])) have.set(n.id, n)
+    const toCancel = []
+    for (const [id, n] of have) {
+      const w = want.get(id)
+      if (!w) { toCancel.push({ id }); continue }
+      const schedAt = n.schedule && n.schedule.at ? new Date(n.schedule.at).getTime() : 0
+      if (schedAt && Math.abs(schedAt - w.at) > 5000) { toCancel.push({ id }); continue }
+      want.delete(id)  // 已正确注册，跳过
+    }
+    if (toCancel.length) await LN.cancel({ notifications: toCancel })
+    if (want.size) {
+      const spaceName = S.space ? S.space.name : ''
+      await LN.schedule({
+        notifications: [...want.entries()].map(([id, w]) => ({
+          id,
+          title: '⏰ 任务提醒' + (spaceName ? ' · ' + spaceName : ''),
+          body: '「' + (w.title || '未命名任务') + '」到时间了',
+          schedule: { at: new Date(w.at), allowWhileIdle: true },
+          channelId: 'task-alerts',
+          sound: 'default',
+          extra: { taskId: id },
+        })),
+      })
+    }
+  } catch (e) { /* 同步失败不影响主流程 */ }
+  finally { lnSyncing = false }
+}
+// 点系统通知 → 打开对应任务查看页
+let lnTapBound = false
+function lnBindTap() {
+  const LN = lnPlugin()
+  if (!LN || lnTapBound || !LN.addListener) return
+  lnTapBound = true
+  try {
+    LN.addListener('localNotificationActionPerformed', (n) => {
+      const tid = n && n.notification && n.notification.extra && n.notification.extra.taskId
+      if (tid && S.tasks.some(t => t.id === tid) && $('viewSheet').classList.contains('hidden')) openViewSheet(tid)
+    })
   } catch (e) { /* 静默 */ }
 }
 
